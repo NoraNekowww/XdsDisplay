@@ -210,6 +210,28 @@ public class AdvLink {
     }
 
     /**
+     * 最近一次收到中继遥测（任意通道都算）的时刻，0 = 从没收到过。
+     * 仪表端用它判断"中继是不是断流了" —— 只要还有任一通道在来数据，就不算断。
+     */
+    public long lastAnyMs() {
+        long m = lastPacketMs > lastWifiMs ? lastPacketMs : lastWifiMs;
+        return m > lastConnMs ? m : lastConnMs;
+    }
+
+    /** 各通道最近收包时刻（心跳日志用） */
+    public long advLastMs() {
+        return lastPacketMs;
+    }
+
+    public long wifiLastMs() {
+        return lastWifiMs;
+    }
+
+    public long connLastMs() {
+        return lastConnMs;
+    }
+
+    /**
      * WiFi 通道 / BLE 直连通道收到的遥测（内容与广播里的完全一样，都是 20 字节）。
      * 三路传同一份数据，若都拿去解码踏频会翻倍、时间轴也会乱 —— 所以只让被选中的那一路驱动解码。
      */
@@ -443,6 +465,7 @@ public class AdvLink {
      *   [11..14]经度*1e6  [15..16]海拔m  [17]定位质量  [18]卫星数  [19]左右平衡*2
      */
     private void decode(byte[] t, long now) {
+        if (firstPacketMs == 0) firstPacketMs = now;   // 速率统计的起点（不走广播通道时原来一直是 0，速率算出来是 0.0Hz）
         int flags = t[0] & 0xFF;
         int powerW = u16(t, 1);
         int cadence = t[3] & 0xFF;

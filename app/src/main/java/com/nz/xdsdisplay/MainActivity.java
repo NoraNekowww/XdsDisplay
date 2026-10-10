@@ -104,6 +104,22 @@ public class MainActivity extends AppCompatActivity {
     private AdvLink ble;
     private UdpLink udp;
     private BleServer srv;
+
+    // ── 中继断流监督（2026-10-10 真骑 7km 的 bug：主机说"转发正常"，仪表这边数据全冻住）──
+    private static final String TAG_LINK = "链路";
+    private static final long RELAY_STALL_MS = 5000L;      // 中继静默超过这么久 → 判为断流
+    private static final long RELAY_RETRY_MS = 20000L;     // 自救重试间隔
+    private static final long LINK_HEARTBEAT_MS = 30000L;  // 通道心跳日志周期（骑行回来拿它对账）
+    private long relayStallStartMs;    // 0 = 正常；非 0 = 本次断流起始时刻（按最后一包起算）
+    private long relayTryMs;           // 上次自救时刻
+    private int relayTryCount;         // 本轮自救次数
+    private long relayStallTotal;      // 累计断流次数
+    private long linkHeartbeatMs;      // 上次通道心跳日志时刻
+
+    /** 中继断流中？给 render() 上屏告警用 */
+    private boolean relayStalled() {
+        return relayStallStartMs != 0;
+    }
     private ChartView chart;
     private long lastChartPushMs;
     private final RideStats stats = new RideStats();
@@ -155,8 +171,10 @@ public class MainActivity extends AppCompatActivity {
         loadGearCalibration();      // 挡位自校准：接上次学到的地方继续（没存档=出厂齿比）
         sensors = (android.hardware.SensorManager) getSystemService(SENSOR_SERVICE);
 
+        Logs.install(getApplicationContext());     // 日志落盘：骑行回来还能复盘（Logs.java）
         ble = new AdvLink(this);
         ble.setListener(bleListener);
+        Logs.add(TAG_LINK, "日志文件：" + Logs.dirPath() + "（按天切，超 512KB 滚成 -1）");
         // WiFi 直连（主机开热点、本机连上）：收 UDP 遥测，喂给同一个解码器
         udp = new UdpLink(this, (payload, now) -> {
             AdvLink a = ble;
@@ -1694,9 +1712,10 @@ public class MainActivity extends AppCompatActivity {
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
+            long nowMs = System.currentTimeMillis();
+            superviseRelay(nowMs);      // 中继断流：先判定 + 自救，再刷屏
             render();
             // 挡位校准存档：每分钟写一次（内容没变就不写盘），App 被系统杀掉也不丢
-            long nowMs = System.currentTimeMillis();
             if (nowMs - lastCalSaveMs > 60000L) {
                 lastCalSaveMs = nowMs;
                 saveGearCalibration();
@@ -1845,6 +1864,68 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 中继断流监督（2026-10-10 真骑 7km 的 bug：中继机说"转发正常"，仪表这边数据全冻住）。
+     *
+     * 只看中继三通道（WiFi / 中继广播 / 中继连过来）——仪表自己的麦克风、加速度计不算数。
+     * 判定断流后：① 状态栏闪烁告警，免得骑完才发现数没动 ② 分级自救（补报到 + 重扫广播、
+     * 重建 UDP 接收通路，之后每 20 秒再来一轮）③ 全过程写日志文件，骑行回来能对账。
+     */
+    private void superviseRelay(long now) {
+        long relayMs = ble.lastAnyMs();
+        if (relayMs == 0) return;                       // 从没收到过中继数据 → 是没配对，不是断流
+        long silent = now - relayMs;
+
+        if (silent < RELAY_STALL_MS) {                  // 正常
+            if (relayStallStartMs != 0) {
+                Logs.add(TAG_LINK, "中继恢复：断流 " + ((now - relayStallStartMs) / 1000)
+                        + " 秒 · " + linkDiag(now));
+                relayStallStartMs = 0;
+                relayTryCount = 0;
+            }
+            heartbeat(now);
+            return;
+        }
+
+        if (relayStallStartMs == 0) {                   // 刚断
+            relayStallStartMs = relayMs;                // 按最后一包起算，静默期不算漏
+            relayStallTotal++;
+            relayTryCount = 0;
+            relayTryMs = 0;
+            Logs.add(TAG_LINK, "⚠ 中继断流（已静默 " + (silent / 1000) + " 秒）· " + linkDiag(now));
+        }
+
+        if (relayTryCount > 0 && now - relayTryMs < RELAY_RETRY_MS) return;
+        relayTryMs = now;
+        relayTryCount++;
+        String why = "中继断流自救第 " + relayTryCount + " 次（已断 "
+                + ((now - relayStallStartMs) / 1000) + " 秒）";
+        udp.nudge(why);                                 // 补报到 + 重建 UDP 接收通路
+        ble.reconnect();                                // 重开广播扫描
+        Logs.add(TAG_LINK, why + " · " + linkDiag(now));
+    }
+
+    /** 通道心跳：每 30 秒一条，写进日志文件 —— 下次再卡住，看这一行就知道断的是哪条路 */
+    private void heartbeat(long now) {
+        if (now - linkHeartbeatMs < LINK_HEARTBEAT_MS) return;
+        linkHeartbeatMs = now;
+        Logs.add(TAG_LINK, "通道心跳 · " + linkDiag(now)
+                + " · 累计断流 " + relayStallTotal + " 次");
+    }
+
+    /** 通道诊断串：一眼看出哪条路断了 */
+    private String linkDiag(long now) {
+        return String.format(Locale.CHINA,
+                "中继广播 %.1fs 前 / WiFi %.1fs 前 / BLE连入 %.1fs 前（WiFi 包 %d，自愈 %d 次）",
+                ago(now, ble.advLastMs()), ago(now, ble.wifiLastMs()), ago(now, ble.connLastMs()),
+                udp.packets(), udp.rebuildCount());
+    }
+
+    /** 距某时刻多少秒（-1 = 从没收到过），日志用 */
+    private static double ago(long now, long t) {
+        return t <= 0 ? -1 : (now - t) / 1000.0;
+    }
+
     private void render() {
         txtClock.setText(num(clock.format(new Date())));
 
@@ -1853,6 +1934,15 @@ public class MainActivity extends AppCompatActivity {
         long now = System.currentTimeMillis();
         // 【任务】Link 卡右侧的空闲位置挂一段 GPS 信号状态（星数 / RTK / --）
         chipStatus.setText(stateText + gpsSuffix(now));
+
+        // 【中继断流监督】数据不再刷新时必须看得见：状态栏换成闪烁告警
+        // （2026-10-10 真骑 7km：中继机显示"正常转发"，仪表这边数字冻了整趟没人察觉）
+        if (relayStalled()) {
+            long sec = Math.max(0, now - relayStallStartMs) / 1000;
+            boolean blinkOn = (now / 500) % 2 == 0;
+            chipStatus.setTextColor(getColor(sec >= 20 ? R.color.err : R.color.warn));
+            chipStatus.setText((blinkOn ? "⚠ " : "　") + "中继断流 " + sec + "s" + gpsSuffix(now));
+        }
         CpsParser.Data cps = lastCps;
         LnParser.Data ln = lastLn;
 

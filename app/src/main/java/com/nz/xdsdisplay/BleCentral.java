@@ -100,6 +100,9 @@ public class BleCentral {
     public String getPeerName() { return peerName; }
     public boolean isReady() { return state == State.READY; }
     public long cpsCount() { return cpsCount; }
+
+    /** 最近一次收到功率/定位包的时刻（取两者较新，0 = 还没收到过）—— 给中继断流监督用 */
+    public long lastDataMs() { return Math.max(lastCpsAt, lastLnAt); }
     public long lnCount() { return lnCount; }
 
     // ================================================================

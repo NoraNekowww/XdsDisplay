@@ -13,6 +13,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * WiFi 直连接收端（从机侧）。
@@ -107,7 +108,7 @@ public class UdpLink {
     private final Context ctx;
     private final Listener listener;
 
-    private DatagramSocket socket;
+    private volatile DatagramSocket socket;      // 会被链路自愈线程关掉重建，必须 volatile
     private WifiManager.MulticastLock mcast;
     private WifiManager.WifiLock wifiLock;
     private Thread rxThread, helloThread;
@@ -129,6 +130,178 @@ public class UdpLink {
     /** 3 秒内有包就算 WiFi 链路活着 */
     public boolean isAlive() {
         return lastRxMs > 0 && System.currentTimeMillis() - lastRxMs < 3000L;
+    }
+
+    // ---- 链路自愈：收不到遥测时必须自己爬回来，不能卡死 ----
+
+    /** 收到过第一个包之后，静默超过这么久就重建接收通路 */
+    private static final long SILENT_REBUILD_MS = 6000L;
+    /** 一次都没收到过时，给多长宽限（热点刚连上、主机刚起来都要时间） */
+    private static final long FIRST_PACKET_GRACE_MS = 45000L;
+    /** 两次重建之间的最小间隔，别把刚建好的通路又推翻 */
+    private static final long REBUILD_MIN_GAP_MS = 8000L;
+    /** 连续接收异常到这么多条就判定 socket 已废，直接重建 */
+    private static final int ERR_STREAK_LIMIT = 5;
+
+    /** 连着重建了几次仍收不到包：用来做退避（收到包就清零） */
+    private volatile int silentRebuilds;
+
+    private volatile long startedMs;
+    private volatile long lastRebuildMs;
+    private volatile long lastHealthLogMs;
+    private volatile int rebuilds;
+    private volatile int packetsAtHealth;
+    private volatile long healthAtMs;
+    private volatile int errStreak;
+    /** 置位后 hello 线程立刻补发一次报到（重建后马上让主机重新认得本机） */
+    private volatile boolean helloNow;
+
+    /** 距离上次收到主机遥测有多久（毫秒）；从没收到过则返回 -1 */
+    public long silenceMs() {
+        long t = lastRxMs;
+        return t > 0 ? System.currentTimeMillis() - t : -1L;
+    }
+
+    public int rebuildCount() {
+        return rebuilds;
+    }
+
+    /** 收到过主机遥测没有 */
+    public boolean everHeard() {
+        return lastRxMs > 0;
+    }
+
+    /**
+     * 外部（仪表端的中继断流监督）叫我们主动修一次：
+     * 立刻补发报到 + 把接收 socket 重建一遍。便宜、无害，值得在断流时试。
+     */
+    public synchronized void nudge(String why) {
+        if (!running) return;
+        helloNow = true;
+        rebuild("外部请求：" + (why == null ? "断流" : why));
+    }
+
+    /**
+     * 链路健康监督线程：主机那边"显示正常转发"，不代表本机真的收到包了
+     * （热点下广播会被过滤、本机可能被系统切到蜂窝数据、socket 也可能卡死）。
+     * 所以这里只认一个事实：最近有没有真的收到遥测。没有就重建，并如实记进日志。
+     */
+    private void watchLoop() {
+        while (running) {
+            sleep(1000);
+            if (!running) break;
+            long now = System.currentTimeMillis();
+
+            long silent = lastRxMs > 0 ? now - lastRxMs : now - startedMs;
+            long limit = lastRxMs > 0 ? SILENT_REBUILD_MS : FIRST_PACKET_GRACE_MS;
+
+            long gapBackoff = rebuildGapMs();
+            if (socket == null) {
+                if (rebuild("接收 socket 为空")) errStreak = 0;
+            } else if (errStreak >= ERR_STREAK_LIMIT) {
+                if (rebuild("连续接收异常 " + errStreak + " 次")) errStreak = 0;
+            } else if (silent > limit && now - lastRebuildMs > gapBackoff) {
+                // 退避：静默越久，重建间隔越长（10s → 20s → 40s … 最多 5 分钟一次）。
+                // 不然"本来就没接主机"时每几秒重建一次，日志刷屏还白耗电。
+                if (rebuild("已静默 " + (silent / 1000) + " 秒")) silentRebuilds++;
+            }
+
+            if (now - lastHealthLogMs > 60000L) {
+                lastHealthLogMs = now;
+                long dt = now - healthAtMs;
+                int got = (int) (packets - packetsAtHealth);
+                packetsAtHealth = (int) packets;
+                healthAtMs = now;
+                StringBuilder sb = new StringBuilder();
+                sb.append("WiFi 链路自检：总收 ").append(packets).append(" 包");
+                if (dt > 0) {
+                    sb.append(String.format(Locale.CHINA, " · 近 %.0f 秒 %d 包", dt / 1000.0, got));
+                }
+                if (rebuilds > 0) sb.append(" · 已自愈 ").append(rebuilds).append(" 次");
+                if (lastRxMs > 0) sb.append(" · 静默 ").append((now - lastRxMs) / 1000).append(" 秒");
+                sb.append(" · ").append(netState());
+                Logs.add(TAG, sb.toString());
+            }
+        }
+    }
+
+    /** 重建接收 socket：关旧的、开新的、重绑端口，并立刻补报到。返回 true = 这次真重建了 */
+    private synchronized boolean rebuild(String why) {
+        if (!running) return false;
+        long now = System.currentTimeMillis();
+        long sinceLast = now - lastRebuildMs;
+        if (lastRebuildMs > 0 && sinceLast < REBUILD_MIN_GAP_MS) return false;   // 刚建过，别抖
+        lastRebuildMs = now;
+        rebuilds++;
+        errStreak = 0;
+
+        Logs.add(TAG, "⚠ UDP 收包通路重建（" + why + "）· 静默 "
+                + (lastRxMs > 0 ? (now - lastRxMs) / 1000 + " 秒" : "未收到过")
+                + " · " + netState());
+
+        try {
+            DatagramSocket old = socket;
+            socket = null;
+            if (old != null) old.close();
+        } catch (Exception ignore) {}
+
+        try {
+            DatagramSocket s = new DatagramSocket(null);
+            s.setReuseAddress(true);
+            s.setBroadcast(true);
+            s.bind(new InetSocketAddress(PORT));
+            socket = s;
+            helloNow = true;            // 立刻让主机重新认得本机
+            return true;
+        } catch (Exception e) {
+            errStreak++;
+            Logs.add(TAG, "⚠ UDP 重建失败（第 " + errStreak + " 次）：" + e);
+            sleep(300);
+            return false;
+        }
+    }
+
+    /**
+     * 静默重建的退避间隔：连着重建好几次都收不到包，就别每 8 秒折腾一次 ——
+     * 10s → 20s → 40s → … 最多 5 分钟一次。本该没接主机时也照样安静。
+     */
+    private long rebuildGapMs() {
+        int n = Math.min(silentRebuilds, 6);
+        // 从没收到过遥测（本机就是单机用）→ 起步 60 秒，别打扰；
+        // 收到过又断了 → 起步 20 秒，快点爬回来。
+        long base = lastRxMs > 0 ? 20000L : 60000L;
+        long g = base << Math.max(0, n - 1);
+        return Math.min(g, 300000L);
+    }
+
+    /** 当前网络状态，专给日志用：一眼看出"是不是离开了主机的热点" */
+    private String netState() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager)
+                    ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return "网络未知";
+            Network n = cm.getActiveNetwork();
+            if (n == null) return "当前无网络";
+            android.net.NetworkCapabilities nc = cm.getNetworkCapabilities(n);
+            boolean wifi = nc != null && nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI);
+            boolean cell = nc != null && nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR);
+            LinkProperties lp = cm.getLinkProperties(n);
+            String addr = "";
+            if (lp != null) {
+                for (android.net.LinkAddress la : lp.getLinkAddresses()) {
+                    java.net.InetAddress a = la.getAddress();
+                    if (a instanceof java.net.Inet4Address) {
+                        addr = a.getHostAddress();
+                        break;
+                    }
+                }
+            }
+            if (wifi) return "在 WiFi(" + addr + ")" + (relayAddr != null ? "，主机 " + relayAddr.getHostAddress() : "");
+            if (cell) return "⚠ 不在 WiFi，走蜂窝数据(" + addr + ") —— 收不到主机的 UDP";
+            return "非 WiFi 网络(" + addr + ")";
+        } catch (Throwable t) {
+            return "网络状态读取失败";
+        }
     }
 
     public synchronized void start() {
@@ -166,7 +339,15 @@ public class UdpLink {
         helloThread.setDaemon(true);
         helloThread.start();
 
-        Logs.add(TAG, "WiFi 直连已就绪（UDP " + PORT + "），连上主机的热点即可自动接管");
+        startedMs = System.currentTimeMillis();
+        lastHealthLogMs = startedMs;
+        healthAtMs = startedMs;
+        packetsAtHealth = (int) packets;
+        Thread watcher = new Thread(this::watchLoop, "xds-udp-watch");
+        watcher.setDaemon(true);
+        watcher.start();
+
+        Logs.add(TAG, "WiFi 直连已就绪（UDP " + PORT + "），连上主机的热点即可自动接管 · " + netState());
         startSelfTest();
     }
 
@@ -243,7 +424,13 @@ public class UdpLink {
 
                 long now = System.currentTimeMillis();
                 packets++;
+                long gap = lastRxMs > 0 ? now - lastRxMs : 0;
                 lastRxMs = now;
+                errStreak = 0;
+                silentRebuilds = 0;             // 收到包 → 重建退避清零
+                if (gap > 5000L) {
+                    Logs.add(TAG, "WiFi 遥测恢复接收（中断 " + (gap / 1000) + " 秒）· " + netState());
+                }
                 relayAddr = p.getAddress();     // 记下主机地址，方便回下发控制命令
                 if (packets <= 3) {
                     Logs.add(TAG, "WiFi 收到主机遥测 #" + packets
@@ -253,7 +440,12 @@ public class UdpLink {
                 if (l != null) l.onTelemetry(payload, now);
             } catch (Exception e) {
                 if (!running) break;
-                Logs.add(TAG, "WiFi 接收异常：" + e);
+                errStreak++;
+                // 我们自己关掉 socket 重建时必然抛 "Socket closed"，那是预期内的，别当异常记
+                boolean selfInflicted = String.valueOf(e).contains("Socket closed");
+                if (!selfInflicted && (errStreak <= 3 || errStreak % 20 == 0)) {
+                    Logs.add(TAG, "WiFi 接收异常（第 " + errStreak + " 次）：" + e);
+                }
                 sleep(500);
             }
         }
@@ -261,26 +453,39 @@ public class UdpLink {
 
     private void helloLoop() {
         byte[] hello = new byte[]{MAGIC_H[0], MAGIC_H[1], MAGIC_H[2], MAGIC_H[3], (byte) VERSION};
+        int waited = 0;
         while (running) {
             try {
-                DatagramSocket s = socket;
-                if (s != null) {
-                    for (InetAddress a : helloTargets()) {
-                        try {
-                            s.send(new DatagramPacket(hello, hello.length, a, PORT));
-                        } catch (Exception ignore) {
+                boolean force = helloNow;
+                if (force) helloNow = false;
+                if (force || waited >= 2000) {
+                    waited = 0;
+                    DatagramSocket s = socket;
+                    if (s != null) {
+                        for (InetAddress a : helloTargets()) {
+                            try {
+                                s.send(new DatagramPacket(hello, hello.length, a, PORT));
+                            } catch (Exception ignore) {
+                            }
                         }
+                        if (force) Logs.add(TAG, "已向主机补发报到（单播 " + relayAddrText() + "）");
                     }
+                } else {
+                    sleep(200);
+                    waited += 200;
                 }
             } catch (Exception ignore) {
+                sleep(200);
+                waited += 200;
             }
-            sleep(2000);
         }
     }
 
-    /** 报到目标：全局广播 + 本机网关（热点下主机就是这个地址）+ 安卓热点常见网关 */
+    /** 报到目标：主机地址（收到过就优先单播）+ 全局广播 + 本机网关 + 安卓热点常见网关 */
     private List<InetAddress> helloTargets() {
         List<InetAddress> out = new ArrayList<>();
+        InetAddress ra = relayAddr;
+        if (ra != null) out.add(ra);        // 知道主机在哪就直发，热点把广播滤了也不怕
         try {
             out.add(InetAddress.getByName("255.255.255.255"));
         } catch (Exception ignore) {
