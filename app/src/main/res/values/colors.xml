@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0B0E13</color>
+    <color name="surface">#151A22</color>
+    <color name="surface2">#1E242E</color>
+    <color name="stroke">#2A313C</color>
+    <color name="text">#E8EDF2</color>
+    <color name="muted">#8A94A6</color>
+    <color name="label">#AEB9CC</color>
+    <color name="accent">#00E5C0</color>
+    <color name="accent2">#FF7A45</color>
+    <color name="accent3">#80B9FF</color>
+    <color name="ok">#37D67A</color>
+    <color name="warn">#FFB020</color>
+    <color name="err">#FF5C5C</color>
+    <color name="map_water">#12202E</color>
+    <color name="ic_launcher_background">#0B0E13</color>
+</resources>

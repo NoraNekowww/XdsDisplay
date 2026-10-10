@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 二级菜单的单行：比主题默认 48dp 行更紧凑（13 项也能一屏显示，无需滚动） -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="0dp"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp"
+    android:paddingTop="7dp"
+    android:paddingBottom="7dp"
+    android:textSize="15sp"
+    android:textColor="?android:attr/textColorPrimary"
+    android:background="?android:attr/selectableItemBackground"
+    android:gravity="center_vertical" />

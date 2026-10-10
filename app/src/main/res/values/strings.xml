@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">XDS Display</string>
+
+    <!-- cards -->
+    <string name="card_power">POWER W</string>
+    <string name="card_speed">SPD KPH</string>
+    <string name="card_dist">DIST KM</string>
+    <string name="card_cadence">CAD RPM</string>
+    <string name="card_ridetime">RIDE TIME</string>
+    <string name="card_avg">AVG KM/H</string>
+    <string name="card_wind">WIND dB</string>
+    <string name="max_placeholder">MAX --.- km/h</string>
+    <string name="max_fmt">MAX %1$s km/h</string>
+    <string name="wind_sub_fmt">PEAK %1$.0f dB · IDX %2$d</string>
+    <string name="bar_wind">WIND</string>
+    <string name="bar_bump">BUMP/15</string>
+    <string name="wind_mic_off">MIC OFF</string>
+
+    <!-- buttons -->
+    <string name="btn_pause">PAUSE</string>
+    <string name="btn_resume">RESUME</string>
+    <string name="btn_start">START</string>
+    <string name="btn_follow">FOLLOW</string>
+    <string name="btn_free">FREE</string>
+    <string name="btn_full">FULL</string>
+    <string name="btn_window">WINDOW</string>
+    <string name="btn_rotate">ROTATE</string>
+    <string name="btn_menu">MENU</string>
+    <string name="btn_view_map">MAP</string>
+    <string name="btn_view_chart">GRPH</string>
+    <string name="menu_colors">COLOR THEME (Hex)</string>
+    <string name="menu_digit_fmt">DIGIT FONT: %1$s</string>
+    <string name="digit_mono">MONO</string>
+    <string name="digit_square">SQUARE</string>
+    <!-- 顶栏 Link 卡右侧的 GPS 信号状态：%1$s 取卫星数 / RTK / 无定位时的短横 -->
+
+    <string name="chip_gps_fmt">GPS %1$s</string>
+    <string name="theme_title">COLOR THEME (Hex)</string>
+    <string name="theme_bg">BACKGROUND</string>
+    <string name="theme_card">CARD FACE</string>
+    <string name="theme_stroke">CARD BORDER</string>
+    <string name="theme_accent">ACCENT (POWER / TRACK)</string>
+    <string name="theme_accent2">ACCENT 2 (CADENCE)</string>
+    <string name="theme_accent3">ACCENT 3 (SPEED / ROUTE)</string>
+    <string name="theme_apply">APPLY</string>
+    <string name="theme_reset">RESET</string>
+    <string name="theme_bad_hex">Bad hex value: %1$s</string>
+
+    <!-- menu -->
+    <string name="menu_title">MENU</string>
+    <string name="menu_reconnect">RECONNECT</string>
+    <string name="menu_reset">RESET RIDE DATA</string>
+    <string name="menu_channel_fmt">CHANNEL: %1$s</string>
+    <string name="menu_offline">OFFLINE MAP</string>
+    <string name="menu_import_gpx">IMPORT GPX ROUTE</string>
+    <string name="menu_import_gpx_replace">IMPORT GPX ROUTE (replace)</string>
+    <string name="menu_clear_gpx_fmt">CLEAR GPX ROUTE (%1$s)</string>
+    <string name="menu_language_fmt">LANGUAGE: %1$s</string>
+    <string name="menu_gear_cal_fmt">GEAR CAL: %1$s</string>
+    <string name="gear_cal_none">not learned yet</string>
+    <string name="gear_cal_state_fmt">%1$d/%2$d gears, scale %3$s</string>
+    <string name="gear_cal_title">GEAR SELF-CALIBRATION</string>
+    <string name="gear_cal_reset">RESET</string>
+    <string name="gear_cal_toast_reset">Gear calibration reset (factory teeth/wheel table)</string>
+    <string name="gear_cal_hint">The factory table (48T / 11-48T / 2.146 m) is always the baseline. A small systematic offset in wheel circumference or cassette teeth is measured from your own riding and trimmed: one overall scale within +/-3%, plus at most +/-2.5% per gear - never a rewrite of the table. RESET throws the learned data away.</string>
+    <string name="gear_cal_cols">GEAR    THEORY-&gt;JUDGE  MEASURED   N</string>
+    <string name="gear_cal_limit">! Overall offset is beyond the +/-3% trim range - check wheel circumference / cassette teeth.</string>
+
+    <!-- 关于（设置 → 关于）：作者 / 开源仓库 Issues -->
+    <string name="menu_about">ABOUT</string>
+    <string name="about_app">XDS DISPLAY</string>
+    <string name="about_ver_fmt">version %1$s</string>
+    <string name="about_author">Author</string>
+    <string name="about_author_name">nz</string>
+    <string name="about_issues">Issues</string>
+    <!-- 不翻译：开源仓库 Issues 地址（换仓库只改这一处） -->
+    <string name="about_issues_url" translatable="false">https://github.com/NoraNekowww/XdsDisplay/issues</string>
+    <string name="about_car">Bike: XDS AD350 (2025) - 1x12, 48T chainring + 11-48T cassette, 700c (2.146 m)</string>
+    <string name="about_font">Digit font: Orbitron Black (SIL OFL 1.1)</string>
+    <string name="about_hint">Open source on GitHub - tap the Issues link to report a bug or ask for a feature; long-press to copy.</string>
+    <string name="about_open_issues">OPEN ISSUES</string>
+    <string name="about_link_toast">No browser found - link copied to clipboard</string>
+    <string name="about_copied">Link copied</string>
+    <string name="menu_screen_fmt">SCREEN: %1$s</string>
+    <string name="scr_full">FULLSCREEN</string>
+    <string name="scr_window">WINDOWED</string>
+    <string name="menu_rotate">ROTATE SCREEN</string>
+    <string name="lang_en">English</string>
+    <string name="lang_zh">中文</string>
+
+    <!-- channel preference -->
+    <string name="ch_auto">Auto (WiFi &gt; BLE)</string>
+    <string name="ch_wifi">WiFi only</string>
+    <string name="ch_ble_link">BLE link only</string>
+    <string name="ch_ble_adv">BLE adv only</string>
+
+    <!-- command names -->
+    <string name="cmd_pause">PAUSE</string>
+    <string name="cmd_resume">RESUME</string>
+    <string name="cmd_toggle">TOGGLE</string>
+    <string name="cmd_end">END &amp; EXPORT</string>
+    <string name="cmd_start">START</string>
+
+    <!-- dialogs -->
+    <string name="dlg_cancel">CANCEL</string>
+    <string name="dlg_close">CLOSE</string>
+    <string name="reset_title">RESET</string>
+    <string name="reset_msg">Clear distance, average, max speed and the track?</string>
+    <string name="reset_ok">RESET</string>
+    <string name="end_title">END RIDE</string>
+    <string name="end_msg">End the relay\'s current ride and export the FIT to Download/XdsRelay/?</string>
+    <string name="end_ok">END &amp; EXPORT</string>
+    <string name="offline_title_fmt">OFFLINE MAP · source: %1$s</string>
+    <string name="offline_running">Download in progress. You can keep riding - data reception is unaffected.</string>
+    <string name="offline_cancel_dl">CANCEL DOWNLOAD</string>
+    <string name="offline_keep">KEEP GOING</string>
+    <string name="offline_item_5">Around here 5 km (z13-15, ~120 tiles)</string>
+    <string name="offline_item_15">Around here 15 km (z11-14, ~240 tiles)</string>
+    <string name="offline_item_40">Around here 40 km (z9-13, ~410 tiles)</string>
+    <string name="offline_item_clear_fmt">Clear offline tiles (have %1$d)</string>
+    <string name="offline_clear_msg">Clear all downloaded offline tiles?</string>
+    <string name="offline_clear_ok">CLEAR</string>
+    <string name="log_title">LOG</string>
+    <string name="log_empty">no entries</string>
+    <string name="log_clear">CLEAR</string>
+    <string name="perm_title">PERMISSIONS REQUIRED</string>
+    <string name="perm_msg">Without the Nearby-devices permission the app cannot receive power and position data from the relay.\nThe Microphone permission is only used for the wind-noise (drag) reading - not granting it changes nothing else.</string>
+    <string name="perm_settings">SETTINGS</string>
+    <string name="perm_later">LATER</string>
+
+    <!-- toasts -->
+    <string name="toast_searching">Searching for the relay...</string>
+    <string name="toast_channel_fmt">Channel: %1$s</string>
+    <string name="toast_no_picker">No file picker available</string>
+    <string name="toast_loading_gpx">Loading GPX...</string>
+    <string name="toast_gpx_failed_fmt">GPX parse failed: %1$s</string>
+    <string name="toast_gpx_no_points">no track points</string>
+    <string name="toast_route_fmt">Route: %1$s (%2$d pts)</string>
+    <string name="toast_gpx_cleared">GPX route cleared</string>
+    <string name="toast_no_position">No position yet (wait for relay GPS)</string>
+    <string name="toast_wifi_not_ready">WiFi channel not ready</string>
+    <string name="toast_send_failed">Cannot send: relay and display must share a WiFi/hotspot (BLE is one-way)</string>
+    <string name="toast_sent_fmt">Sent: %1$s</string>
+    <string name="toast_sent_broadcast">Sent: %1$s (broadcast)</string>
+    <string name="toast_send_end_fail">Send failed (needs WiFi link)</string>
+    <string name="toast_offline_start">Downloading offline tiles... (keep riding)</string>
+    <string name="toast_offline_cancelled_fmt">Cancelled, tiles: %1$d (failed %2$d)</string>
+    <string name="toast_offline_done_fmt">Offline tiles done: %1$d (failed %2$d)</string>
+    <string name="toast_offline_cleared">Offline tiles cleared</string>
+
+    <!-- link status (top chip) -->
+    <string name="sta_wifi_link">WiFi LINK</string>
+    <string name="sta_ble_link">BLE LINK</string>
+    <string name="sta_adv_link">ADV LINK</string>
+    <string name="sta_bt_off">BLUETOOTH OFF</string>
+    <string name="sta_stopped">STOPPED</string>
+    <string name="sta_scanner_unavailable">SCANNER UNAVAILABLE</string>
+    <string name="sta_scanning">SCANNING FOR RELAY...</string>
+    <string name="sta_scan_failed">SCAN FAILED</string>
+    <string name="sta_scan_failed_fmt">SCAN FAILED %1$d</string>
+    <string name="sta_adv_lost">ADV LOST, RESCANNING...</string>
+    <string name="sta_relay_ok">RELAY DATA OK</string>
+    <string name="ble_no_adapter">No Bluetooth on this device</string>
+    <string name="ble_no_perm">Missing Bluetooth permission</string>
+    <string name="ble_scan_denied">Scan denied by system</string>
+    <string name="ble_connect_refused">Connection refused</string>
+    <string name="ble_gatt_null">connectGatt failed</string>
+    <string name="ble_disconnected">DISCONNECTED</string>
+
+    <!-- map overlay -->
+    <string name="map_follow">FOLLOW</string>
+    <string name="map_free">FREE</string>
+    <string name="map_trk_fmt">TRK %1$d</string>
+    <string name="map_waiting">WAITING FOR RELAY GPS...</string>
+    <string name="map_tiles_down">Basemap unavailable (offline) - track keeps recording</string>
+    <string name="tile_carto">CARTO dark</string>
+    <string name="tile_amap">AMap</string>
+    <string name="tile_osm">OSM</string>
+
+    <!-- chart legend：图例只标「满量程」（当前值在卡片大数字上，不再重复）；≤ 表示这条曲线的纵轴上限 -->
+    <string name="chart_pwr_fmt">PWR ≤%1$dW</string>
+    <string name="chart_cad_fmt">CAD ≤%1$d</string>
+    <string name="chart_spd_fmt">SPD ≤%1$d</string>
+    <!-- 窄屏退化：只留数字 -->
+    <string name="chart_fs_short_fmt">%1$d</string>
+    <string name="menu_wind_fmt">WIND FILTER: %1$s</string>
+    <string name="card_gear">GEAR</string>
+</resources>

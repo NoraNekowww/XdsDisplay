@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">XDS 骑行终端</string>
+
+    <!-- cards -->
+    <string name="card_power">功率 W</string>
+    <string name="card_speed">速度 KPH</string>
+    <string name="card_dist">里程 km</string>
+    <string name="card_cadence">踏频 RPM</string>
+    <string name="card_ridetime">骑行时间</string>
+    <string name="card_avg">均速 km/h</string>
+    <string name="card_gear">齿比</string>
+    <string name="card_wind">风噪 dB</string>
+    <string name="max_placeholder">最高 --.- km/h</string>
+    <string name="max_fmt">最高 %1$s km/h</string>
+    <string name="wind_sub_fmt">峰值 %1$.0f dB · 指数 %2$d</string>
+    <string name="bar_wind">风噪</string>
+    <string name="bar_bump">颠簸/15</string>
+    <string name="wind_mic_off">风噪计未启动</string>
+
+    <!-- buttons -->
+    <string name="btn_pause">暂停</string>
+    <string name="btn_resume">继续</string>
+    <string name="btn_start">开始</string>
+    <string name="btn_follow">跟随</string>
+    <string name="btn_free">自由</string>
+    <string name="btn_full">全屏</string>
+    <string name="btn_window">窗口</string>
+    <string name="btn_rotate">旋转</string>
+    <string name="btn_menu">菜单</string>
+    <string name="btn_view_map">地图</string>
+    <string name="btn_view_chart">曲线</string>
+    <string name="menu_colors">配色（Hex）</string>
+    <string name="menu_digit_fmt">数字字体：%1$s</string>
+    <string name="digit_mono">等宽</string>
+    <string name="digit_square">方形</string>
+    <!-- 顶栏 Link 卡右侧的 GPS 信号状态：%1$s 取卫星数 / RTK / 无定位时的短横 -->
+    <string name="chip_gps_fmt">GPS %1$s</string>
+    <string name="theme_title">配色（Hex）</string>
+    <string name="theme_bg">背景</string>
+    <string name="theme_card">卡片底色</string>
+    <string name="theme_stroke">卡片描边</string>
+    <string name="theme_accent">主色（功率 / 轨迹）</string>
+    <string name="theme_accent2">次色（踏频）</string>
+    <string name="theme_accent3">速度色（速度 / 路书）</string>
+    <string name="theme_apply">应用</string>
+    <string name="theme_reset">恢复默认</string>
+    <string name="theme_bad_hex">颜色格式不对：%1$s</string>
+
+    <!-- menu -->
+    <string name="menu_title">菜单</string>
+    <string name="menu_reconnect">重新连接</string>
+    <string name="menu_reset">清零骑行数据</string>
+    <string name="menu_channel_fmt">数据通道：%1$s</string>
+    <string name="menu_offline">离线地图</string>
+    <string name="menu_import_gpx">导入 GPX 路书</string>
+    <string name="menu_import_gpx_replace">导入 GPX 路书（替换）</string>
+    <string name="menu_clear_gpx_fmt">清除 GPX 路书（%1$s）</string>
+    <string name="menu_gear_cal_fmt">挡位校准：%1$s</string>
+    <string name="gear_cal_none">还没学过</string>
+    <string name="gear_cal_state_fmt">已学 %1$d/%2$d 档 · 尺度 %3$s</string>
+    <string name="gear_cal_title">挡位自动校准</string>
+    <string name="gear_cal_reset">重置</string>
+    <string name="gear_cal_toast_reset">已重置挡位校准（回到出厂齿数/轮周长表）</string>
+    <string name="gear_cal_hint">判定基准永远是出厂表（48T / 11-48T / 2.146m）。轮周长、飞轮齿数跟真车有小幅系统偏差时，程序从你自己的骑行里量出来做微调：整体尺度最多 ±3%，每档再最多 ±2.5% —— 再大就当作「预设本身不对」，不会硬掰。重置 = 丢掉学习结果，回到出厂表。</string>
+    <string name="gear_cal_cols">齿比   理论→判定  实测偏差  帧数</string>
+    <string name="gear_cal_limit">！实测整体偏差超出 ±3% 微调范围 —— 请核对轮周长 / 飞轮齿数表。</string>
+    <string name="menu_wind_fmt">风噪过滤：%1$s</string>
+
+    <!-- 关于（设置 → 关于）：作者 / 开源仓库 Issues -->
+    <string name="menu_about">关于</string>
+    <string name="about_app">XDS DISPLAY 骑行显示终端</string>
+    <string name="about_ver_fmt">版本 %1$s</string>
+    <string name="about_author">作者</string>
+    <string name="about_author_name">nz</string>
+    <string name="about_issues">问题反馈</string>
+    <string name="about_car">车辆：喜德盛 AD350 2025 款 · 1×12 单盘 48T + 11-48T 飞轮 · 700c（周长 2.146m）</string>
+    <string name="about_font">数字字体：Orbitron Black（SIL OFL 1.1 开源）</string>
+    <string name="about_hint">已在 GitHub 开源：点 Issues 地址反馈问题或提需求，长按复制。</string>
+    <string name="about_open_issues">打开 Issues</string>
+    <string name="about_link_toast">没找到浏览器，链接已复制到剪贴板</string>
+    <string name="about_copied">链接已复制</string>
+    <string name="menu_language_fmt">语言：%1$s</string>
+    <string name="menu_screen_fmt">画面：%1$s</string>
+    <string name="scr_full">全屏</string>
+    <string name="scr_window">窗口</string>
+    <string name="menu_rotate">旋转屏幕</string>
+    <string name="lang_en">English</string>
+    <string name="lang_zh">中文</string>
+
+    <!-- channel preference -->
+    <string name="ch_auto">自动（WiFi 优先）</string>
+    <string name="ch_wifi">只用 WiFi</string>
+    <string name="ch_ble_link">只用 BLE 直连</string>
+    <string name="ch_ble_adv">只用 BLE 广播</string>
+
+    <!-- command names -->
+    <string name="cmd_pause">暂停</string>
+    <string name="cmd_resume">继续</string>
+    <string name="cmd_toggle">暂停/继续</string>
+    <string name="cmd_end">结束并导出</string>
+    <string name="cmd_start">开始</string>
+
+    <!-- dialogs -->
+    <string name="dlg_cancel">取消</string>
+    <string name="dlg_close">关闭</string>
+    <string name="reset_title">清零</string>
+    <string name="reset_msg">清空里程、均速、最高速和轨迹？</string>
+    <string name="reset_ok">清零</string>
+    <string name="end_title">结束记录</string>
+    <string name="end_msg">结束中继端的这次骑行记录，并把 FIT 导出到 下载/XdsRelay/ ？</string>
+    <string name="end_ok">结束并导出</string>
+    <string name="offline_title_fmt">离线地图 · 瓦片源：%1$s</string>
+    <string name="offline_running">正在下载中。下载期间可以继续骑行，不影响收数据。</string>
+    <string name="offline_cancel_dl">取消下载</string>
+    <string name="offline_keep">继续</string>
+    <string name="offline_item_5">当前位置周围 5km（z13-15，约 120 张）</string>
+    <string name="offline_item_15">当前位置周围 15km（z11-14，约 240 张）</string>
+    <string name="offline_item_40">当前位置周围 40km（z9-13，约 410 张）</string>
+    <string name="offline_item_clear_fmt">清除离线地图（当前 %1$d 张）</string>
+    <string name="offline_clear_msg">清空已下载的离线瓦片？</string>
+    <string name="offline_clear_ok">清空</string>
+    <string name="log_title">运行日志</string>
+    <string name="log_empty">暂无日志</string>
+    <string name="log_clear">清空</string>
+    <string name="perm_title">需要权限</string>
+    <string name="perm_msg">没有「附近设备」权限就无法接收中继转发的功率与定位数据。\n「麦克风」权限只用于风噪（风阻）测量，不给也不影响收数据。</string>
+    <string name="perm_settings">去设置</string>
+    <string name="perm_later">稍后</string>
+
+    <!-- toasts -->
+    <string name="toast_searching">正在重新寻找中转机…</string>
+    <string name="toast_channel_fmt">数据通道：%1$s</string>
+    <string name="toast_no_picker">没有可用的文件选择器</string>
+    <string name="toast_loading_gpx">正在读取 GPX…</string>
+    <string name="toast_gpx_failed_fmt">GPX 解析失败：%1$s</string>
+    <string name="toast_gpx_no_points">没有轨迹点</string>
+    <string name="toast_route_fmt">路书：%1$s（%2$d 点）</string>
+    <string name="toast_gpx_cleared">已清除 GPX 路书</string>
+    <string name="toast_no_position">还没有定位（等中继转发坐标）</string>
+    <string name="toast_wifi_not_ready">WiFi 通道未就绪</string>
+    <string name="toast_send_failed">下发失败：中继和终端要在同一热点/WiFi 上（BLE 是单向的）</string>
+    <string name="toast_sent_fmt">已下发：%1$s</string>
+    <string name="toast_sent_broadcast">已下发：%1$s（广播）</string>
+    <string name="toast_send_end_fail">下发失败（需要 WiFi 直连）</string>
+    <string name="toast_offline_start">开始下载离线地图…（可继续骑行）</string>
+    <string name="toast_offline_cancelled_fmt">已取消，已下 %1$d 张（失败 %2$d）</string>
+    <string name="toast_offline_done_fmt">离线地图下载完成：%1$d 张（失败 %2$d）</string>
+    <string name="toast_offline_cleared">离线地图已清除</string>
+
+    <!-- link status (top chip) -->
+    <string name="sta_wifi_link">WiFi 直连中</string>
+    <string name="sta_ble_link">BLE 直连中</string>
+    <string name="sta_adv_link">广播直连中</string>
+    <string name="sta_bt_off">蓝牙未开启</string>
+    <string name="sta_stopped">已停止</string>
+    <string name="sta_scanner_unavailable">扫描器不可用</string>
+    <string name="sta_scanning">正在搜索中转机广播…</string>
+    <string name="sta_scan_failed">扫描失败</string>
+    <string name="sta_scan_failed_fmt">扫描失败 %1$d</string>
+    <string name="sta_adv_lost">广播中断，正在重新搜索…</string>
+    <string name="sta_relay_ok">已收到中转机数据</string>
+    <string name="ble_no_adapter">本机没有蓝牙</string>
+    <string name="ble_no_perm">缺少蓝牙权限</string>
+    <string name="ble_scan_denied">扫描被系统拒绝</string>
+    <string name="ble_connect_refused">连接被拒绝</string>
+    <string name="ble_gatt_null">connectGatt 失败</string>
+    <string name="ble_disconnected">已断开</string>
+
+    <!-- map overlay -->
+    <string name="map_follow">跟随</string>
+    <string name="map_free">自由</string>
+    <string name="map_trk_fmt">轨迹 %1$d 点</string>
+    <string name="map_waiting">等待中继转发 GPS 定位…</string>
+    <string name="map_tiles_down">底图暂时取不到（离线），轨迹仍在记录</string>
+    <string name="tile_carto">CARTO 深色</string>
+    <string name="tile_amap">高德</string>
+    <string name="tile_osm">OSM</string>
+
+    <!-- chart legend：图例只标「满量程」（当前值在卡片大数字上，不再重复）；≤ 表示这条曲线的纵轴上限 -->
+    <string name="chart_pwr_fmt">功率 ≤%1$dW</string>
+    <string name="chart_cad_fmt">踏频 ≤%1$d</string>
+    <string name="chart_spd_fmt">速度 ≤%1$d</string>
+    <!-- 窄屏退化：只留数字 -->
+    <string name="chart_fs_short_fmt">%1$d</string>
+</resources>

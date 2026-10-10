@@ -1,0 +1,30 @@
+# ---- Gradle / 构建产物 ----
+.gradle/
+build/
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# ---- IDE / 系统 ----
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+*.swp
+
+# ---- 本机私有配置（SDK 路径、签名口令等，绝不提交）----
+local.properties
+keystore.properties
+*.jks
+*.keystore
+*.p12
+
+# ---- 自检脚本的中间产物（verify/ 下的源码保留）----
+verify/**/*.txt
+verify/**/*.log
+verify/**/*.png
+verify/**/classes/
+verify/**/out/
