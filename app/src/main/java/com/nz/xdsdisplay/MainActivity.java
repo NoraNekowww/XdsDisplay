@@ -45,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String[] KEY_G_AXIS_LEGACY =
             {"g_axis_mode", "g_axis_mode_land", "g_axis_mode_land_v2"};
     private static final String KEY_VIEW_CHART = "main_view_chart";
+    /** 音量下键：G 力球 / WIND-BUMP 卡片二选一（true=显示 G 力球） */
+    private static final String KEY_SHOW_BALL = "main_show_ball";
     /** 挡位自校准的存档（GearRatio.exportCalibration 的字符串，跨骑行累积） */
     private static final String KEY_GEAR_CAL = "gear_cal_v1";
     private static final String KEY_ORIENT = "orient";
@@ -272,6 +274,7 @@ public class MainActivity extends AppCompatActivity {
         updateFollowButton();
         applyColors();
         applyViewMode();
+        applyBallWind();
     }
 
     private boolean isLandscape() {
@@ -342,12 +345,32 @@ public class MainActivity extends AppCompatActivity {
         setViewMode(!prefs().getBoolean(KEY_VIEW_CHART, false));
     }
 
-    /** 直接切到指定视图（音量键用：+ 折线图、− 地图，不必先猜当前在哪个视图） */
+    /** 直接切到指定视图（屏幕上 VIEW 按钮用；音量上键走 toggleViewMode） */
     private void setViewMode(boolean chartOn) {
         boolean same = prefs().getBoolean(KEY_VIEW_CHART, false) == chartOn;
         prefs().edit().putBoolean(KEY_VIEW_CHART, chartOn).apply();
         applyViewMode();
         Logs.add(TAG, "主视图 → " + (chartOn ? "折线图" : "地图") + (same ? "（本来就是）" : ""));
+    }
+
+    /** G 力球 / WIND-BUMP 卡片二选一（音量下键切，选择记住）：两块在布局里共用同一个格位 */
+    private void applyBallWind() {
+        boolean ballOn = prefs().getBoolean(KEY_SHOW_BALL, true);
+        android.view.View ball = findViewById(R.id.gforce);
+        android.view.View wind = findViewById(R.id.cardWind);
+        if (ball != null) {
+            ball.setVisibility(ballOn ? android.view.View.VISIBLE : android.view.View.GONE);
+        }
+        if (wind != null) {
+            wind.setVisibility(ballOn ? android.view.View.GONE : android.view.View.VISIBLE);
+        }
+    }
+
+    private void toggleBallWind() {
+        boolean ballOn = !prefs().getBoolean(KEY_SHOW_BALL, true);
+        prefs().edit().putBoolean(KEY_SHOW_BALL, ballOn).apply();
+        applyBallWind();
+        Logs.add(TAG, "G力球/WIND-BUMP → " + (ballOn ? "G 力球" : "WIND/BUMP 卡片"));
     }
 
     /** Hex 配色对话框：背景 / 卡片 / 描边 / 三个主色 */
@@ -2053,19 +2076,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ================================================================
-    //  音量键：上、下**两个键功能完全一样** —— 都是「图表 ⇄ 地图」对切。
-    //  2026-10 改（用户要求「两键都用来 switch，而不是一一对应」）：旧版 VOL+ 钉在折线图、
-    //  VOL− 钉在地图，想看一眼地图得先记住自己现在在哪个视图；现在随便按哪个键就是翻一下，
-    //  骑车时不用想。更早的版本 VOL− 还兼着暂停/结束骑行，早废了 ——
-    //  暂停 / 继续 / 结束骑行一律走屏幕上的 btnPause。
+    //  音量键：两键分工（2026-10 用户要求，替代此前「两键等价」的做法）。
+    //   · 上键 —— 「折线图 ⇄ 地图」对切（与屏幕上 btnView 同效），不用先记住当前在哪个视图。
+    //   · 下键 —— 「G 力球 ⇄ WIND/BUMP 卡片」对切：布局里这两块共用同一格位、同时只显示一个，
+    //            切走的那块会把整行让出来。选择记进 main_show_ball。
+    //  更早的版本 VOL− 还兼着暂停/结束骑行，早废了 —— 暂停 / 继续 / 结束骑行一律走 btnPause。
     // ================================================================
 
     @Override
     public boolean onKeyDown(int keyCode, android.view.KeyEvent e) {
-        if (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
-                || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN) {
-            if (e.getRepeatCount() == 0) toggleViewMode();       // 图表 ⇄ 地图，两键等价
-            return true;
+        boolean up = keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP;
+        boolean down = keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN;
+        if (up || down) {
+            if (e.getRepeatCount() == 0) {
+                if (up) {
+                    toggleViewMode();        // 上键：折线图 ⇄ 地图
+                } else {
+                    toggleBallWind();        // 下键：G 力球 ⇄ WIND/BUMP 卡片
+                }
+            }
+            return true;                     // 不外放给系统调音量
         }
         return super.onKeyDown(keyCode, e);
     }

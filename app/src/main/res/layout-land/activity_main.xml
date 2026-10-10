@@ -50,7 +50,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_marginTop="3dp"
-                android:layout_weight="1.20"
+                android:layout_weight="1.60"
                 android:orientation="horizontal">
 
                 <com.google.android.material.card.MaterialCardView
@@ -132,7 +132,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_marginTop="3dp"
-                android:layout_weight="0.87"
+                android:layout_weight="1.15"
                 android:orientation="horizontal">
 
                 <com.google.android.material.card.MaterialCardView
@@ -203,51 +203,20 @@
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
-            <!-- 骑行时间(含最高速度) / 风噪 / G 力大圆盘 -->
+            <!-- WIND/BUMP 卡片 ⇄ G 力大圆盘（音量下键切换：同位置，同时只显示一个） -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_marginTop="3dp"
-                android:layout_weight="1.63"
+                android:layout_weight="1.15"
                 android:orientation="horizontal">
-
-                <com.google.android.material.card.MaterialCardView
-                    style="@style/XdsCard"
-                    android:layout_width="0dp" android:layout_height="match_parent"
-                    android:layout_weight="1">
-                    <LinearLayout android:layout_width="match_parent"
-                        android:layout_height="match_parent" android:orientation="vertical">
-                        <TextView style="@style/XdsLabel" android:layout_width="wrap_content"
-                            android:layout_height="wrap_content" android:text="@string/card_ridetime" />
-                        <TextView android:id="@+id/txtRideTime" style="@style/XdsSmall"
-                            android:layout_width="match_parent" android:layout_height="0dp"
-                            android:layout_weight="1" android:gravity="center_vertical"
-                            android:maxLines="1" android:text="--:--:--"
-                            android:autoSizeTextType="uniform"
-                            android:autoSizeMinTextSize="11sp"
-                            android:autoSizeMaxTextSize="26sp"
-                            android:autoSizeStepGranularity="1sp" />
-                        <TextView style="@style/XdsLabel" android:layout_width="wrap_content"
-                            android:layout_height="wrap_content" android:text="@string/card_avg" />
-                        <TextView android:id="@+id/txtAvgSpeed" style="@style/XdsSmall"
-                            android:layout_width="match_parent" android:layout_height="0dp"
-                            android:layout_weight="0.85" android:gravity="center_vertical"
-                            android:maxLines="1" android:text=" -.-"
-                            android:autoSizeTextType="uniform"
-                            android:autoSizeMinTextSize="10sp"
-                            android:autoSizeMaxTextSize="24sp"
-                            android:autoSizeStepGranularity="1sp" />
-                        <TextView android:id="@+id/txtMaxSpeed" style="@style/XdsLabel"
-                            android:layout_width="match_parent" android:layout_height="wrap_content"
-                            android:textSize="9sp" android:maxLines="1" android:text="@string/max_placeholder" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
 
                 <!-- 风噪：取消 "WIND DB" 标题，让两条顶格 -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardWind"
                     style="@style/XdsCard"
                     android:layout_width="0dp" android:layout_height="match_parent"
-                    android:layout_marginStart="3dp" android:layout_weight="0.72">
+                    android:layout_marginStart="3dp" android:layout_weight="1">
                     <LinearLayout android:layout_width="match_parent"
                         android:layout_height="match_parent" android:orientation="vertical">
                         <com.nz.xdsdisplay.WindBumpBars
@@ -268,8 +237,60 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_marginStart="3dp"
-                    android:layout_weight="1.48" />
+                    android:layout_weight="1" />
             </LinearLayout>
+
+            <!-- 底部「重要信息」双卡：骑行时间 | 均速(含最高速)。只占一条窄带，
+                 把纵向空间让给上面 Power / Speed / RPM 这些重点大数字。 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="3dp"
+                android:layout_weight="0.58"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/XdsCard"
+                    android:layout_width="0dp" android:layout_height="match_parent"
+                    android:layout_weight="1">
+                    <LinearLayout android:layout_width="match_parent"
+                        android:layout_height="match_parent" android:orientation="vertical">
+                        <TextView style="@style/XdsLabel" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:text="@string/card_ridetime" />
+                        <TextView android:id="@+id/txtRideTime" style="@style/XdsSmall"
+                            android:layout_width="match_parent" android:layout_height="0dp"
+                            android:layout_weight="1" android:gravity="center_vertical"
+                            android:maxLines="1" android:text="--:--:--"
+                            android:autoSizeTextType="uniform"
+                            android:autoSizeMinTextSize="12sp"
+                            android:autoSizeMaxTextSize="44sp"
+                            android:autoSizeStepGranularity="1sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/XdsCard"
+                    android:layout_width="0dp" android:layout_height="match_parent"
+                    android:layout_marginStart="3dp" android:layout_weight="1">
+                    <LinearLayout android:layout_width="match_parent"
+                        android:layout_height="match_parent" android:orientation="vertical">
+                        <TextView style="@style/XdsLabel" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:text="@string/card_avg" />
+                        <TextView android:id="@+id/txtAvgSpeed" style="@style/XdsSmall"
+                            android:layout_width="match_parent" android:layout_height="0dp"
+                            android:layout_weight="1" android:gravity="center_vertical"
+                            android:maxLines="1" android:text=" -.-\n"
+                            android:autoSizeTextType="uniform"
+                            android:autoSizeMinTextSize="12sp"
+                            android:autoSizeMaxTextSize="44sp"
+                            android:autoSizeStepGranularity="1sp" />
+                        <TextView android:id="@+id/txtMaxSpeed" style="@style/XdsLabel"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:textSize="10sp" android:maxLines="1" android:text="@string/max_placeholder" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
         </LinearLayout>
 
         <!-- ================= 右：地图 + 折线图 ================= -->

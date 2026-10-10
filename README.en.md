@@ -31,6 +31,20 @@ Plain Java with hand-drawn native views. Only two dependencies: `appcompat` and 
 - Hex-customisable colour theme, full-screen / windowed, portrait / landscape
 - Settings → About links to this repository's issue tracker
 
+## Controls
+
+Hands stay on the bar:
+
+| Key | Action |
+| --- | --- |
+| Volume up | Toggle area chart ⇄ map (same as the on-screen VIEW button) |
+| Volume down | Toggle G-force ball ⇄ WIND/BUMP card — they share one slot in the layout, and the hidden one hands its whole row to the numbers that matter |
+
+Both choices (`main_view_chart` / `main_show_ball`) persist across launches.
+
+The data column is weighted top-down: **power / speed** (largest) → distance / cadence+gear → wind⇄G-force → a two-card
+"ride time / average speed" strip along the bottom, so Power, Speed and RPM get the screen while riding.
+
 ## Data sources
 
 | Link | Notes |
