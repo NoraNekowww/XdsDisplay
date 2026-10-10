@@ -45,8 +45,14 @@ public class MainActivity extends AppCompatActivity {
     private static final String[] KEY_G_AXIS_LEGACY =
             {"g_axis_mode", "g_axis_mode_land", "g_axis_mode_land_v2"};
     private static final String KEY_VIEW_CHART = "main_view_chart";
-    /** 音量下键：G 力球 / WIND-BUMP 卡片二选一（true=显示 G 力球） */
-    private static final String KEY_SHOW_BALL = "main_show_ball";
+    /** 音量下键：页面模式（true=精简页：去掉 WIND/BUMP 卡与 G 力大圆盘，放大 速度/功率/踏频） */
+    private static final String KEY_FOCUS_PAGE = "main_focus_page";
+    /** 上一版「G 力球 ⇄ WIND-BUMP 二选一」留下的偏好键：语义已废，启动时清掉（见 setupUi） */
+    private static final String KEY_SHOW_BALL_LEGACY = "main_show_ball";
+    /** 精简页把「功率/速度」与「里程/踏频」两行按这个倍数放大（省下的高度全给重点数字） */
+    private static final float FOCUS_ROW_SCALE = 1.6f;
+    /** 精简页把底部那条（重要信息双卡）压到多薄：省下的高度给上面的重点大数字 */
+    private static final float FOCUS_BOTTOM_SCALE = 0.55f;
     /** 挡位自校准的存档（GearRatio.exportCalibration 的字符串，跨骑行累积） */
     private static final String KEY_GEAR_CAL = "gear_cal_v1";
     private static final String KEY_ORIENT = "orient";
@@ -63,6 +69,8 @@ public class MainActivity extends AppCompatActivity {
     private BalanceStrip balStrip;      // Power 卡下边缘的左右平衡细条
     private SpeedTape speedTape;        // 速度卡右侧的 HUD 带状刻度
     private GForceView gforce;
+    /** 经典布局里三行的原始权重（setupUi 每次都重新膨胀布局，所以每次重新量；横竖屏值不同，不写死） */
+    private float wPowerSpeed, wDistCad, wBottom;
     /** 道路颠簸：z 轴加速度局部方差的近期平均（纯算法、不碰 Context，见 BumpMeter） */
     private final BumpMeter bump = new BumpMeter();
     private Button btnFollow, btnZoomIn, btnZoomOut, btnFullscreen, btnView;
@@ -238,6 +246,7 @@ public class MainActivity extends AppCompatActivity {
         // 免得哪天又冒出一个「看不见的镜像覆盖」。
         android.content.SharedPreferences.Editor ce = prefs().edit();
         for (String k : KEY_G_AXIS_LEGACY) ce.remove(k);
+        ce.remove(KEY_SHOW_BALL_LEGACY);   // 旧的「球 / 风卡二选一」已废，别留着复发
         ce.apply();
         btnFollow = findViewById(R.id.btnFollow);
         btnZoomIn = findViewById(R.id.btnZoomIn);
@@ -274,7 +283,8 @@ public class MainActivity extends AppCompatActivity {
         updateFollowButton();
         applyColors();
         applyViewMode();
-        applyBallWind();
+        captureRowWeights();     // 先量下经典布局两行的权重（精简页按倍数放大、切回来要原样还）
+        applyFocusPage();        // 页面模式：经典全量 ⇄ 精简页（音量下键切）
     }
 
     private boolean isLandscape() {
@@ -353,24 +363,55 @@ public class MainActivity extends AppCompatActivity {
         Logs.add(TAG, "主视图 → " + (chartOn ? "折线图" : "地图") + (same ? "（本来就是）" : ""));
     }
 
-    /** G 力球 / WIND-BUMP 卡片二选一（音量下键切，选择记住）：两块在布局里共用同一个格位 */
-    private void applyBallWind() {
-        boolean ballOn = prefs().getBoolean(KEY_SHOW_BALL, true);
-        android.view.View ball = findViewById(R.id.gforce);
-        android.view.View wind = findViewById(R.id.cardWind);
-        if (ball != null) {
-            ball.setVisibility(ballOn ? android.view.View.VISIBLE : android.view.View.GONE);
-        }
-        if (wind != null) {
-            wind.setVisibility(ballOn ? android.view.View.GONE : android.view.View.VISIBLE);
-        }
+    /** 量下经典布局里「功率/速度」行与「里程/踏频」行的权重，作为精简页放大 / 切回的基准 */
+    private void captureRowWeights() {
+        wPowerSpeed = rowWeight(R.id.rowPowerSpeed);
+        wDistCad = rowWeight(R.id.rowDistCad);
+        wBottom = rowWeight(R.id.rowBottom);       // 底部那条：左边卡片列 + 右边正方形加速度计
     }
 
-    private void toggleBallWind() {
-        boolean ballOn = !prefs().getBoolean(KEY_SHOW_BALL, true);
-        prefs().edit().putBoolean(KEY_SHOW_BALL, ballOn).apply();
-        applyBallWind();
-        Logs.add(TAG, "G力球/WIND-BUMP → " + (ballOn ? "G 力球" : "WIND/BUMP 卡片"));
+    private float rowWeight(int id) {
+        android.view.View v = findViewById(id);
+        if (v == null || !(v.getLayoutParams() instanceof LinearLayout.LayoutParams)) return 0f;
+        return ((LinearLayout.LayoutParams) v.getLayoutParams()).weight;
+    }
+
+    /**
+     * 页面模式（音量下键切，选择记住）：
+     *  · 经典全量（默认）—— 底部左边是 WIND/BUMP 卡 + 重要信息双卡，右边是正方形加速度计。
+     *  · 精简页 —— 把 WIND/BUMP 卡和加速度计整块收掉（没有 WIND、没有 BUMP、没有加速度计），
+     *              省下的高度放大「功率/速度」与「里程/踏频+档位」两行，底部信息带压薄
+     *              —— 速度、功率、踏频(RPM) 因此明显变大，这正是重点信息页。
+     */
+    private void applyFocusPage() {
+        boolean focus = prefs().getBoolean(KEY_FOCUS_PAGE, false);
+        hideView(R.id.cardWind, focus);      // WIND/BUMP 卡（两条都在这一张卡里）
+        hideView(R.id.gforce, focus);        // 正方形加速度计区
+        scaleRow(R.id.rowPowerSpeed, wPowerSpeed, focus ? FOCUS_ROW_SCALE : 1f);
+        scaleRow(R.id.rowDistCad, wDistCad, focus ? FOCUS_ROW_SCALE : 1f);
+        scaleRow(R.id.rowBottom, wBottom, focus ? FOCUS_BOTTOM_SCALE : 1f);
+    }
+
+    private void hideView(int id, boolean hide) {
+        android.view.View v = findViewById(id);
+        if (v != null) v.setVisibility(hide ? android.view.View.GONE : android.view.View.VISIBLE);
+    }
+
+    /** 行高按 weight 放大/还原：base 是经典布局量下来的原始权重，k=1 就是原样还回去 */
+    private void scaleRow(int id, float base, float k) {
+        android.view.View v = findViewById(id);
+        if (v == null || base <= 0f) return;         // 万一是没有这一行的老布局：跳过，不崩
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) v.getLayoutParams();
+        lp.weight = base * k;
+        v.setLayoutParams(lp);
+    }
+
+    private void toggleFocusPage() {
+        boolean focus = !prefs().getBoolean(KEY_FOCUS_PAGE, false);
+        prefs().edit().putBoolean(KEY_FOCUS_PAGE, focus).apply();
+        applyFocusPage();
+        Logs.add(TAG, "页面模式 → " + (focus
+                ? "精简页（无 WIND/BUMP/G力球，放大 速度/功率/踏频）" : "经典全量"));
     }
 
     /** Hex 配色对话框：背景 / 卡片 / 描边 / 三个主色 */
@@ -2078,8 +2119,8 @@ public class MainActivity extends AppCompatActivity {
     // ================================================================
     //  音量键：两键分工（2026-10 用户要求，替代此前「两键等价」的做法）。
     //   · 上键 —— 「折线图 ⇄ 地图」对切（与屏幕上 btnView 同效），不用先记住当前在哪个视图。
-    //   · 下键 —— 「G 力球 ⇄ WIND/BUMP 卡片」对切：布局里这两块共用同一格位、同时只显示一个，
-    //            切走的那块会把整行让出来。选择记进 main_show_ball。
+    //   · 下键 —— 「经典全量布局 ⇄ 精简页」对切：精简页把 WIND/BUMP 卡与正方形加速度计区收掉，
+    //            省下的高度放大 速度 / 功率 / 踏频(RPM)。选择记进 main_focus_page。
     //  更早的版本 VOL− 还兼着暂停/结束骑行，早废了 —— 暂停 / 继续 / 结束骑行一律走 btnPause。
     // ================================================================
 
@@ -2092,7 +2133,7 @@ public class MainActivity extends AppCompatActivity {
                 if (up) {
                     toggleViewMode();        // 上键：折线图 ⇄ 地图
                 } else {
-                    toggleBallWind();        // 下键：G 力球 ⇄ WIND/BUMP 卡片
+                    toggleFocusPage();       // 下键：经典全量 ⇄ 精简页（放大 速度/功率/踏频）
                 }
             }
             return true;                     // 不外放给系统调音量

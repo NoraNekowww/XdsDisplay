@@ -165,6 +165,27 @@ public class GForceView extends View {
         }
     }
 
+    /**
+     * 正方形：布局里这块是「宽 wrap_content / 高 match_parent」，这里把测量宽度压成和高度一样。
+     * 方框多大，圆盘就能画多大（onDraw 用 min(w,h)/2 当半径），所以「加速度计占比」只由这一行的高度决定。
+     * 宽度不够时按宽度收 —— 横竖屏、任何权重比例都不会被裁。
+     */
+    @Override
+    protected void onMeasure(int wSpec, int hSpec) {
+        int w = MeasureSpec.getSize(wSpec);
+        int h = MeasureSpec.getSize(hSpec);
+        if (h <= 0) h = w;
+        int side;
+        if (MeasureSpec.getMode(wSpec) == MeasureSpec.UNSPECIFIED || w <= 0) {
+            side = h;
+        } else {
+            // 宽度上限：最多占这一行 60%，左边那列卡片（WIND/BUMP + 重要信息双卡）永远有地方站
+            side = Math.min(h, (int) (w * 0.6f));
+        }
+        if (side <= 0) side = Math.max(w, h);
+        setMeasuredDimension(side, side);
+    }
+
     @Override
     protected void onDraw(Canvas c) {
         super.onDraw(c);

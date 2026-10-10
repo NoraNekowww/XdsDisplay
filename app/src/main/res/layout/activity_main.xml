@@ -49,6 +49,7 @@
 
         <!-- ===== 功率 / 速度（标题竖排在卡内左侧，数值占满高度、贴右边缘） ===== -->
         <LinearLayout
+            android:id="@+id/rowPowerSpeed"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginTop="3dp"
@@ -134,6 +135,7 @@
 
         <!-- ===== 里程 / 踏频（中缝和上面一行对齐） ===== -->
         <LinearLayout
+            android:id="@+id/rowDistCad"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginTop="3dp"
@@ -208,92 +210,102 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <!-- ===== WIND/BUMP 卡片 ⇄ G 力大圆盘（音量下键切换：同位置，同时只显示一个） ===== -->
+        <!-- 底部：左边是卡片列（WIND/BUMP 卡 上、重要信息双卡 下），右边是**正方形**加速度计区 ——
+             音量下键切精简页时把 WIND/BUMP 卡和加速度计整块收掉，省下的高度让给重点数字 -->
         <LinearLayout
+            android:id="@+id/rowBottom"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginTop="3dp"
-            android:layout_weight="1.15"
+            android:layout_weight="1.30"
             android:orientation="horizontal">
 
-            <!-- 风噪：取消 "WIND DB" 标题，让两条顶格 -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardWind"
-                style="@style/XdsCard"
-                android:layout_width="0dp" android:layout_height="match_parent"
-                android:layout_marginStart="3dp" android:layout_weight="1">
-                <LinearLayout android:layout_width="match_parent"
-                    android:layout_height="match_parent" android:orientation="vertical">
-                    <com.nz.xdsdisplay.WindBumpBars
-                        android:id="@+id/windBars"
-                        android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_weight="1" />
-                    <TextView android:id="@+id/txtWindSub" style="@style/XdsLabel"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp" android:textSize="10sp"
-                        android:maxLines="1" android:text="峰值 --" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- G 力：不要卡片背景，直接画一个大圆（圆盘自己带 前/后/左/右 与峰值标注） -->
-            <com.nz.xdsdisplay.GForceView
-                android:id="@+id/gforce"
+            <LinearLayout
+                android:id="@+id/colBottomLeft"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_marginStart="3dp"
-                android:layout_weight="1" />
-        </LinearLayout>
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-        <!-- 底部「重要信息」双卡：骑行时间 | 均速(含最高速)。只占一条窄带，
-             把纵向空间让给上面 Power / Speed / RPM 这些重点大数字。 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginTop="3dp"
-            android:layout_weight="0.62"
-            android:orientation="horizontal">
+                <!-- 风噪：取消 "WIND DB" 标题，让两条顶格 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardWind"
+                    style="@style/XdsCard"
+                    android:layout_width="match_parent" android:layout_height="0dp"
+                    android:layout_weight="1.15">
+                    <LinearLayout android:layout_width="match_parent"
+                        android:layout_height="match_parent" android:orientation="vertical">
+                        <com.nz.xdsdisplay.WindBumpBars
+                            android:id="@+id/windBars"
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1" />
+                        <TextView android:id="@+id/txtWindSub" style="@style/XdsLabel"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp" android:textSize="10sp"
+                            android:maxLines="1" android:text="峰值 --" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.card.MaterialCardView
-                style="@style/XdsCard"
-                android:layout_width="0dp" android:layout_height="match_parent"
-                android:layout_weight="1">
-                <LinearLayout android:layout_width="match_parent"
-                    android:layout_height="match_parent" android:orientation="vertical">
-                    <TextView style="@style/XdsLabel" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="@string/card_ridetime" />
-                    <TextView android:id="@+id/txtRideTime" style="@style/XdsSmall"
-                        android:layout_width="match_parent" android:layout_height="0dp"
-                        android:layout_weight="1" android:gravity="center_vertical"
-                        android:maxLines="1" android:text="--:--:--"
-                        android:autoSizeTextType="uniform"
-                        android:autoSizeMinTextSize="12sp"
-                        android:autoSizeMaxTextSize="44sp"
-                        android:autoSizeStepGranularity="1sp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="3dp"
+                    android:layout_weight="0.85"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.card.MaterialCardView
+                        style="@style/XdsCard"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1">
+                        <LinearLayout android:layout_width="match_parent"
+                            android:layout_height="match_parent" android:orientation="vertical">
+                            <TextView style="@style/XdsLabel" android:layout_width="wrap_content"
+                                android:layout_height="wrap_content" android:text="@string/card_ridetime" />
+                            <TextView android:id="@+id/txtRideTime" style="@style/XdsSmall"
+                                android:layout_width="match_parent" android:layout_height="0dp"
+                                android:layout_weight="1" android:gravity="center_vertical"
+                                android:maxLines="1" android:text="--:--:--"
+                                android:autoSizeTextType="uniform"
+                                android:autoSizeMinTextSize="12sp"
+                                android:autoSizeMaxTextSize="44sp"
+                                android:autoSizeStepGranularity="1sp" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        style="@style/XdsCard"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_marginStart="3dp" android:layout_weight="1">
+                        <LinearLayout android:layout_width="match_parent"
+                            android:layout_height="match_parent" android:orientation="vertical">
+                            <TextView style="@style/XdsLabel" android:layout_width="wrap_content"
+                                android:layout_height="wrap_content" android:text="@string/card_avg" />
+                            <TextView android:id="@+id/txtAvgSpeed" style="@style/XdsSmall"
+                                android:layout_width="match_parent" android:layout_height="0dp"
+                                android:layout_weight="1" android:gravity="center_vertical"
+                                android:maxLines="1" android:text=" -.-\n"
+                                android:autoSizeTextType="uniform"
+                                android:autoSizeMinTextSize="12sp"
+                                android:autoSizeMaxTextSize="44sp"
+                                android:autoSizeStepGranularity="1sp" />
+                            <TextView android:id="@+id/txtMaxSpeed" style="@style/XdsLabel"
+                                android:layout_width="match_parent" android:layout_height="wrap_content"
+                                android:textSize="10sp" android:maxLines="1" android:text="@string/max_placeholder" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.card.MaterialCardView
-                style="@style/XdsCard"
-                android:layout_width="0dp" android:layout_height="match_parent"
-                android:layout_marginStart="3dp" android:layout_weight="1">
-                <LinearLayout android:layout_width="match_parent"
-                    android:layout_height="match_parent" android:orientation="vertical">
-                    <TextView style="@style/XdsLabel" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="@string/card_avg" />
-                    <TextView android:id="@+id/txtAvgSpeed" style="@style/XdsSmall"
-                        android:layout_width="match_parent" android:layout_height="0dp"
-                        android:layout_weight="1" android:gravity="center_vertical"
-                        android:maxLines="1" android:text=" -.-\n"
-                        android:autoSizeTextType="uniform"
-                        android:autoSizeMinTextSize="12sp"
-                        android:autoSizeMaxTextSize="44sp"
-                        android:autoSizeStepGranularity="1sp" />
-                    <TextView android:id="@+id/txtMaxSpeed" style="@style/XdsLabel"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:textSize="10sp" android:maxLines="1" android:text="@string/max_placeholder" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <!-- 加速度计：宽 wrap_content + GForceView.onMeasure 强制 宽=高，所以这块永远是正方形，
+                 边长跟着这一行的高度长；其余卡片都在它左边 -->
+            <com.nz.xdsdisplay.GForceView
+                android:id="@+id/gforce"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="3dp" />
         </LinearLayout>
 
         <!-- ===== 地图 + 功率/速度折线图 ===== -->
