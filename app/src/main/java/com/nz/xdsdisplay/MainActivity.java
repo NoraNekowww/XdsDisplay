@@ -124,6 +124,16 @@ public class MainActivity extends AppCompatActivity {
     private long lastChartPushMs;
     private final RideStats stats = new RideStats();
     private final Handler ui = new Handler(Looper.getMainLooper());
+
+    // ── 【刷新链看门狗】2026-10-11 真骑冻结（20:17:03 起）的元凶就是下面那条 tick：
+    //    它最后一句 ui.postDelayed(this,200) 一旦没执行到，整条刷新链就永远断了 ——
+    //    屏上数字僵在上一帧、连断流告警也一起哑掉，而 BLE/风噪这些自己的线程照常跑，
+    //    表现就是"看着像正常连接，但数据不动"，只能重开 App。
+    //    现在：tick 自身兜异常 + 独立线程盯着补排，App 自己就能救回来。
+    private volatile long lastTickAtMs;      // 刷新链最后一次开跑的时刻
+    private volatile boolean uiAlive;        // Activity 还活着（onDestroy 置 false）
+    private boolean watchdogArmed;
+    private long uiBeatMs;                   // 屏上心跳日志的上次时刻
     /** 齿比卡自检线程（只有 adb 带 --ez simgear true 启动时才起） */
     private Thread simThread;
     /** G 力自检（adb 带 --ez simaccel true）：不注册真实传感器，改喂合成加速度，见 simGForceLoop() */
@@ -195,6 +205,15 @@ public class MainActivity extends AppCompatActivity {
         if (simAccel && simThread == null) {
             simThread = new Thread(this::simGForceLoop, "sim-gforce");
             simThread.start();
+        }
+        // 刷新链自检（看门狗验证）：启动 8 秒后人为掐掉 tick，模拟 2026-10-11 真骑那次
+        // 「刷新链自己死了、只能重开 App」。正常情况下看门狗应在约 4 秒内发现并自动重启刷新。
+        //   adb shell am start -n com.nz.xdsdisplay/.MainActivity --ez simstall true
+        if (getIntent() != null && getIntent().getBooleanExtra("simstall", false)) {
+            ui.postDelayed(() -> {
+                Logs.add(TAG_LINK, "【自检】模拟刷新链死亡：取消 tick 排程");
+                ui.removeCallbacks(tick);
+            }, 8000L);
         }
         srv = new BleServer(this, (payload, now) -> {
             AdvLink a = ble;
@@ -945,8 +964,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        uiAlive = true;
+        Logs.add(TAG_LINK, "生命周期 onResume（刷新链保持运行）");
         ui.removeCallbacks(tick);
         ui.post(tick);
+        startWatchdog();
         if (ble != null && ble.getState() == BleCentral.State.IDLE) startSources();
         startLocalSensors();
     }
@@ -954,9 +976,21 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        ui.removeCallbacks(tick);
-        stopLocalSensors();
+        // 【2026-10-11 真骑冻结】原来这里 removeCallbacks(tick)：骑行中一旦被系统弹窗/半透明窗口
+        // 盖住（Activity 只 pause 不 destroy，屏幕照旧显示仪表），数字就永远冻在上一帧，
+        // 连断流告警也一起哑掉，只能重开 App —— 码表不该是这样。
+        // 暂停也照样刷：数据一直在来，屏上就必须一直更新。
+        Logs.add(TAG_LINK, "生命周期 onPause（刷新链继续运行）");
         saveGearCalibration();      // 退到后台就把校准存档写下来
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // 真正看不见了（切走/息屏）才停本地传感器省电；刷新链保留运行，
+        // 这样回来时数据与断流监督都是最新的，不会留下一块"假活的旧屏"
+        Logs.add(TAG_LINK, "生命周期 onStop（停本地传感器，刷新链保留）");
+        stopLocalSensors();
     }
 
     private android.content.SharedPreferences prefs() {
@@ -1152,6 +1186,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        Logs.add(TAG_LINK, "生命周期 onDestroy");
+        uiAlive = false;             // 刷新链停排（视图已经没了，别再碰）
+        watchdogArmed = false;       // 看门狗线程退出
+        ui.removeCallbacks(tick);
         if (udp != null) udp.stop();
         if (srv != null) srv.stop();
         super.onDestroy();
@@ -1713,16 +1751,81 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
             long nowMs = System.currentTimeMillis();
-            superviseRelay(nowMs);      // 中继断流：先判定 + 自救，再刷屏
-            render();
-            // 挡位校准存档：每分钟写一次（内容没变就不写盘），App 被系统杀掉也不丢
-            if (nowMs - lastCalSaveMs > 60000L) {
-                lastCalSaveMs = nowMs;
-                saveGearCalibration();
+            lastTickAtMs = nowMs;
+            try {
+                superviseRelay(nowMs);      // 中继断流：先判定 + 自救，再刷屏
+                render();
+                // 挡位校准存档：每分钟写一次（内容没变就不写盘），App 被系统杀掉也不丢
+                if (nowMs - lastCalSaveMs > 60000L) {
+                    lastCalSaveMs = nowMs;
+                    saveGearCalibration();
+                }
+                // 【屏上心跳】每 5 秒记一行"界面真正刷出来的值"：
+                // 下次骑行回来一看就知道是"刷新链停了"还是"刷新在跑、但数据是旧的"
+                if (nowMs - uiBeatMs > 5000L) {
+                    uiBeatMs = nowMs;
+                    CpsParser.Data c = lastCps;
+                    LnParser.Data l = lastLn;
+                    Logs.add(TAG_LINK, "刷新心跳 · 屏上 功率="
+                            + (c == null ? "-" : c.powerW + "W")
+                            + " 踏频=" + String.format(Locale.CHINA, "%.0f", cadence)
+                            + " 速度=" + (l == null || !l.hasSpeed ? "-"
+                                    : String.format(Locale.CHINA, "%.1f", l.speedMps * 3.6))
+                            + " 星=" + (l == null ? "-" : l.sats)
+                            + " 中继" + String.format(Locale.CHINA, "%.1f",
+                                    ago(nowMs, ble.lastAnyMs())) + "s 前");
+                }
+            } catch (Throwable t) {
+                // 兜住任何一帧的异常：原来是裸调用，抛一次这条链就永远断了（20:17 真骑冻结的根因）
+                Logs.add(TAG_LINK, "⚠ 刷新异常（已兜住，继续刷新）："
+                        + android.util.Log.getStackTraceString(t));
+            } finally {
+                if (uiAlive) ui.postDelayed(this, 200L);   // 无论出什么事，下一拍一定排上
             }
-            ui.postDelayed(this, 200L);
         }
     };
+
+    /**
+     * 刷新链看门狗：一个独立线程，每秒看一眼。刷新链停摆超过 3 秒就立刻补排。
+     * 「界面突然不刷新、只能重开 App」这毛病从此自愈（2026-10-11 真骑 20:17 冻结实测）。
+     */
+    private void startWatchdog() {
+        if (watchdogArmed) return;
+        watchdogArmed = true;
+        Thread t = new Thread(() -> {
+            boolean stallLogged = false;
+            while (watchdogArmed) {
+                try {
+                    Thread.sleep(1000L);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                if (!watchdogArmed) return;
+                long gap = System.currentTimeMillis() - lastTickAtMs;
+                if (gap > 3000L) {
+                    if (!stallLogged) {
+                        stallLogged = true;
+                        // 停摆时把主线程栈抓进日志 —— 下次再冻，直接看这段就知道是"卡在某个锁里"
+                        // 还是"根本没被排上"，不用再靠猜（2026-10-11 那次就是只能猜）
+                        StackTraceElement[] st = Looper.getMainLooper().getThread().getStackTrace();
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < Math.min(st.length, 16); i++) {
+                            sb.append("\n    at ").append(st[i]);
+                        }
+                        Logs.add(TAG_LINK, "⚠ 刷新链停摆 " + (gap / 1000) + " 秒 → 自动重启刷新；主线程栈："
+                                + sb);
+                    }
+                    ui.removeCallbacks(tick);
+                    ui.post(tick);
+                } else if (stallLogged) {
+                    stallLogged = false;
+                    Logs.add(TAG_LINK, "刷新链已恢复（停摆结束）");
+                }
+            }
+        }, "xds-ui-watchdog");
+        t.setDaemon(true);
+        t.start();
+    }
 
     /** 上次写挡位校准存档的时刻（tick 是 5Hz，所以按墙钟计时） */
     private long lastCalSaveMs;
