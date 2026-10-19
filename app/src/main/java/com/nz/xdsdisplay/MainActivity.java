@@ -3,6 +3,7 @@ package com.nz.xdsdisplay;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.ColorStateList;
@@ -31,6 +32,9 @@ import androidx.core.content.res.ResourcesCompat;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -218,6 +222,17 @@ public class MainActivity extends AppCompatActivity {
         srv = new BleServer(this, (payload, now) -> {
             AdvLink a = ble;
             if (a != null) a.feedExternal(payload, now, AdvLink.CH_CONN_NAME);
+        });
+        srv.setGpxListener(new BleServer.GpxListener() {
+            @Override
+            public void onGpxReceived(String fileName, byte[] data) {
+                handleReceivedGpx(fileName, data);
+            }
+
+            @Override
+            public void onGpxProgress(int receivedBytes, int totalBytes) {
+                Logs.add("GPX", "接收中继端路书进度: " + receivedBytes + " / " + totalBytes + " B");
+            }
         });
         // adb 直接触发离线下载（方便无人值守验证）：
         //   adb shell am start -n com.nz.xdsdisplay/.MainActivity --ef lat 39.9042 --ef lon 116.4074 --ei offline 5
@@ -933,6 +948,33 @@ public class MainActivity extends AppCompatActivity {
             if (r == null) return;
             runOnUiThread(() -> applyRoute(r, false));
         }, "xds-gpx-load").start();
+    }
+
+    /** 处理从中继端通过蓝牙接收到的 GPX 路书文件 */
+    private void handleReceivedGpx(String fileName, byte[] data) {
+        if (data == null || data.length == 0) return;
+        new Thread(() -> {
+            try {
+                File outFile = new File(getFilesDir(), GpxRoute.FILE_NAME);
+                try (FileOutputStream fos = new FileOutputStream(outFile)) {
+                    fos.write(data);
+                    fos.flush();
+                }
+                GpxRoute r = GpxRoute.parse(new ByteArrayInputStream(data), fileName);
+                getSharedPreferences("xdsdisplay", Context.MODE_PRIVATE)
+                        .edit()
+                        .putString("gpx_name", r.name)
+                        .apply();
+                Logs.add(TAG, "已成功通过蓝牙载入中继端路书：" + r.label() + " (" + r.size() + " 点)");
+                runOnUiThread(() -> {
+                    applyRoute(r, true);
+                    Toast.makeText(MainActivity.this, "已通过蓝牙加载路书: " + r.label(), Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception e) {
+                Logs.add(TAG, "解析蓝牙传输的路书失败：" + e);
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "路书解析失败: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        }, "xds-gpx-ble-rx").start();
     }
 
     /**

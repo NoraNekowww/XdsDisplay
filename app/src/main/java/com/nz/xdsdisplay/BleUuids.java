@@ -35,4 +35,7 @@ public final class BleUuids {
     public static final UUID XDS_SERVICE         = uuid16(0x1828);
     public static final UUID XDS_MEASUREMENT     = uuid16(0x2A63);
     public static final UUID XDS_CONTROL         = uuid16(0x2A55);
+
+    /** GPX 路线文件蓝牙传输特征值（中继端 -> 码表端） */
+    public static final UUID CHR_GPX             = UUID.fromString("0000ad04-0000-1000-8000-00805f9b34fb");
 }

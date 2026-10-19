@@ -17,9 +17,12 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Context;
 import android.os.ParcelUuid;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.zip.CRC32;
 
 /**
  * BLE 直连服务端（显示端）。
@@ -50,19 +53,49 @@ public class BleServer {
     /** 控制帧第 0 字节：魔数（用来和遥测区分） */
     public static final byte CTRL_MAGIC = (byte) 0xA5;
 
+    public static final UUID CHR_GPX = BleUuids.CHR_GPX;
+
+    // ---- GPX 文件传输协议常量 ----
+    public static final byte PKT_TYPE_START = 0x01;
+    public static final byte PKT_TYPE_DATA  = 0x02;
+    public static final byte PKT_TYPE_END   = 0x03;
+    public static final byte PKT_TYPE_ACK   = 0x04;
+
+    public static final byte ACK_READY    = 0x00;
+    public static final byte ACK_PROGRESS = 0x01;
+    public static final byte ACK_SUCCESS  = 0x02;
+    public static final byte ACK_ERROR    = (byte) 0xFF;
+
     private static final int PAYLOAD_LEN = 20;
 
     public interface Listener {
         void onTelemetry(byte[] payload, long now);
     }
 
+    public interface GpxListener {
+        void onGpxReceived(String fileName, byte[] data);
+        void onGpxProgress(int receivedBytes, int totalBytes);
+    }
+
+    private static class GpxSession {
+        int expectedSize;
+        long expectedCrc;
+        int totalChunks;
+        String fileName = "route.gpx";
+        final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        long lastPacketMs;
+    }
+
     private final Context ctx;
     private final Listener listener;
+    private volatile GpxListener gpxListener;
     private final Set<String> connected = new HashSet<>();
 
     private BluetoothGattServer server;
     private BluetoothLeAdvertiser advertiser;
     private BluetoothGattCharacteristic ctrlChr;
+    private BluetoothGattCharacteristic gpxChr;
+    private GpxSession currentGpxSession;
     private volatile boolean running;
     private volatile long packets;
     private volatile long ctrlSent;
@@ -70,6 +103,10 @@ public class BleServer {
     public BleServer(Context c, Listener l) {
         this.ctx = c.getApplicationContext();
         this.listener = l;
+    }
+
+    public void setGpxListener(GpxListener l) {
+        this.gpxListener = l;
     }
 
     public long packets() {
@@ -167,10 +204,28 @@ public class BleServer {
                         | BluetoothGattDescriptor.PERMISSION_WRITE);
         cccd.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
         ctrlChr.addDescriptor(cccd);
+
+        // GPX 路线传输特征：中转机向此特征写入 START, DATA, END 包，本机 NOTIFY 回传 ACK
+        gpxChr = new BluetoothGattCharacteristic(
+                CHR_GPX,
+                BluetoothGattCharacteristic.PROPERTY_WRITE
+                        | BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE
+                        | BluetoothGattCharacteristic.PROPERTY_NOTIFY
+                        | BluetoothGattCharacteristic.PROPERTY_READ,
+                BluetoothGattCharacteristic.PERMISSION_WRITE
+                        | BluetoothGattCharacteristic.PERMISSION_READ);
+        BluetoothGattDescriptor gpxCccd = new BluetoothGattDescriptor(
+                CCCD,
+                BluetoothGattDescriptor.PERMISSION_READ
+                        | BluetoothGattDescriptor.PERMISSION_WRITE);
+        gpxCccd.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+        gpxChr.addDescriptor(gpxCccd);
+
         BluetoothGattService svc = new BluetoothGattService(
                 SVC, BluetoothGattService.SERVICE_TYPE_PRIMARY);
         svc.addCharacteristic(chr);
         svc.addCharacteristic(ctrlChr);
+        svc.addCharacteristic(gpxChr);
         if (!server.addService(svc)) {
             Logs.add(TAG, "添加 GATT 服务失败");
         }
@@ -213,6 +268,8 @@ public class BleServer {
         }
         advertiser = null;
         server = null;
+        gpxChr = null;
+        currentGpxSession = null;
         synchronized (connected) {
             connected.clear();
         }
@@ -263,19 +320,108 @@ public class BleServer {
                 } catch (Exception ignore) {
                 }
             }
-            if (characteristic == null || !CHR.equals(characteristic.getUuid())) return;
-            if (value == null || value.length < PAYLOAD_LEN) return;
+            if (characteristic == null || value == null || value.length == 0) return;
 
-            byte[] payload = new byte[PAYLOAD_LEN];
-            System.arraycopy(value, 0, payload, 0, PAYLOAD_LEN);
+            // 1. 遥测特征值
+            if (CHR.equals(characteristic.getUuid())) {
+                if (value.length < PAYLOAD_LEN) return;
+                byte[] payload = new byte[PAYLOAD_LEN];
+                System.arraycopy(value, 0, payload, 0, PAYLOAD_LEN);
 
-            packets++;
-            long now = System.currentTimeMillis();
-            if (packets <= 3) {
-                Logs.add(TAG, "收到遥测 #" + packets + "（来自 " + device.getAddress() + "）");
+                packets++;
+                long now = System.currentTimeMillis();
+                if (packets <= 3) {
+                    Logs.add(TAG, "收到遥测 #" + packets + "（来自 " + device.getAddress() + "）");
+                }
+                Listener l = listener;
+                if (l != null) l.onTelemetry(payload, now);
+                return;
             }
-            Listener l = listener;
-            if (l != null) l.onTelemetry(payload, now);
+
+            // 2. GPX 路线文件传输特征值
+            if (CHR_GPX.equals(characteristic.getUuid())) {
+                byte type = value[0];
+                if (type == PKT_TYPE_START && value.length >= 12) {
+                    int expectedSize = ((value[1] & 0xFF) << 24)
+                            | ((value[2] & 0xFF) << 16)
+                            | ((value[3] & 0xFF) << 8)
+                            | (value[4] & 0xFF);
+                    long expectedCrc = (((long) value[5] & 0xFF) << 24)
+                            | (((long) value[6] & 0xFF) << 16)
+                            | (((long) value[7] & 0xFF) << 8)
+                            | ((long) value[8] & 0xFF);
+                    int totalChunks = ((value[9] & 0xFF) << 8) | (value[10] & 0xFF);
+                    int nameLen = value[11] & 0xFF;
+                    String fileName = "route.gpx";
+                    if (nameLen > 0 && value.length >= 12 + nameLen) {
+                        fileName = new String(value, 12, nameLen, StandardCharsets.UTF_8);
+                    }
+                    GpxSession session = new GpxSession();
+                    session.expectedSize = expectedSize;
+                    session.expectedCrc = expectedCrc;
+                    session.totalChunks = totalChunks;
+                    session.fileName = fileName;
+                    session.lastPacketMs = System.currentTimeMillis();
+                    currentGpxSession = session;
+                    Logs.add(TAG, "开始接收 GPX: " + fileName + " (" + expectedSize + "B, " + totalChunks + "包)");
+                    sendGpxAck(device, ACK_READY, 0);
+                } else if (type == PKT_TYPE_DATA && value.length >= 3) {
+                    GpxSession session = currentGpxSession;
+                    if (session != null) {
+                        int chunkIdx = ((value[1] & 0xFF) << 8) | (value[2] & 0xFF);
+                        session.buffer.write(value, 3, value.length - 3);
+                        session.lastPacketMs = System.currentTimeMillis();
+                        GpxListener gl = gpxListener;
+                        if (gl != null) {
+                            gl.onGpxProgress(session.buffer.size(), session.expectedSize);
+                        }
+                    }
+                } else if (type == PKT_TYPE_END) {
+                    GpxSession session = currentGpxSession;
+                    if (session != null) {
+                        byte[] completeData = session.buffer.toByteArray();
+                        CRC32 crc = new CRC32();
+                        crc.update(completeData);
+                        long actualCrc = crc.getValue();
+                        if (actualCrc == session.expectedCrc && completeData.length == session.expectedSize) {
+                            Logs.add(TAG, "GPX 完整接收并校验通过! 大小=" + completeData.length);
+                            sendGpxAck(device, ACK_SUCCESS, completeData.length);
+                            GpxListener gl = gpxListener;
+                            if (gl != null) {
+                                gl.onGpxReceived(session.fileName, completeData);
+                            }
+                        } else {
+                            Logs.add(TAG, "GPX 校验失败: CRC exp=" + session.expectedCrc + " act=" + actualCrc
+                                    + " size exp=" + session.expectedSize + " act=" + completeData.length);
+                            sendGpxAck(device, ACK_ERROR, 0);
+                        }
+                        currentGpxSession = null;
+                    }
+                }
+            }
+        }
+
+        @SuppressLint("MissingPermission")
+        private void sendGpxAck(BluetoothDevice dev, byte status, int progress) {
+            BluetoothGattServer s = server;
+            BluetoothGattCharacteristic c = gpxChr;
+            if (s == null || c == null || dev == null) return;
+            byte[] ack = new byte[]{
+                    PKT_TYPE_ACK,
+                    status,
+                    (byte) ((progress >> 8) & 0xFF),
+                    (byte) (progress & 0xFF)
+            };
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    s.notifyCharacteristicChanged(dev, c, false, ack);
+                } else {
+                    c.setValue(ack);
+                    s.notifyCharacteristicChanged(dev, c, false);
+                }
+            } catch (Exception e) {
+                Logs.add(TAG, "GPX ACK 发送失败: " + e);
+            }
         }
 
         @Override
